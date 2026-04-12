@@ -5,6 +5,7 @@ module.exports = async function (context) {
     const client = new sdk.Client();
     const databases = new sdk.Databases(client);
 
+    // Endpoint ကို Global နဲ့ Singapore နှစ်ခုလုံး စမ်းကြည့်နိုင်အောင် Global ကို အရင်သုံးထားပါတယ်
     client
         .setEndpoint('https://cloud.appwrite.io/v1') 
         .setProject('69dbc2e7002c8efa0c80') 
@@ -19,8 +20,7 @@ module.exports = async function (context) {
             'game_data_logs', 
             sdk.ID.unique(),
             {
-                // ကိုမျိုးရဲ့ Dashboard ထဲက Column နာမည်တွေအတိုင်း ပြင်လိုက်ပါပြီ
-                "IssueNumber": String(data.period), 
+                "IssueNumber": String(data.period), // ကိုမျိုး Screenshot ထဲကအတိုင်း "I" အကြီး
                 "number": Number(data.number),
                 "type": String(data.type),
                 "timestamp": Math.floor(Date.now() / 1000)
@@ -31,6 +31,7 @@ module.exports = async function (context) {
         return context.res.json({ message: 'Success' });
 
     } catch (err) {
+        // ဘာကြောင့် Error တက်လဲဆိုတာ အသေးစိတ် သိရအောင် Log ထုတ်ထားပါတယ်
         context.error('❌ Error Details: ' + err.message);
         return context.res.json({ error: err.message }, 500);
     }
