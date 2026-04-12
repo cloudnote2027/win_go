@@ -5,7 +5,6 @@ module.exports = async function (context) {
     const client = new sdk.Client();
     const databases = new sdk.Databases(client);
 
-    // Dashboard ထဲကအတိုင်း sgp Endpoint ကို /v1 ပေါင်းပြီး သုံးထားပါတယ်
     client
         .setEndpoint('https://sgp.cloud.appwrite.io/v1') 
         .setProject('69dbc2e7002c8efa0c80') 
@@ -15,20 +14,23 @@ module.exports = async function (context) {
         const response = await axios.get('https://api.wingogame.com/get-latest-results'); 
         const data = response.data;
 
+        // API ကနေ လာတဲ့ Data တည်ဆောက်ပုံကို context.log နဲ့ အရင်စစ်ကြည့်မယ်
+        context.log('API Data:', JSON.stringify(data));
+
         await databases.createDocument(
             '69dbcab6001e18fba9ec', 
             'game_data_logs', 
             sdk.ID.unique(),
             {
-                // Attribute နာမည်တွေ အကြီးအသေး မှန်အောင် ပြင်ထားပါတယ်
-                "IssueNumber": String(data.period),
-                "number": Number(data.number),
-                "type": String(data.type),
+                // Appwrite Dashboard က Column နာမည်တွေအတိုင်း တန်ဖိုးတွေ ထည့်ပေးထားပါတယ်
+                "IssueNumber": String(data.period || data.issueNumber || "0"),
+                "number": Number(data.number || data.resultNumber || 0), 
+                "type": String(data.type || data.resultType || "none"),
                 "timestamp": Math.floor(Date.now() / 1000)
             }
         );
 
-        context.log('✅ Success: Sync Finished!');
+        context.log('✅ Success: Data saved successfully!');
         return context.res.json({ message: 'Success' });
 
     } catch (err) {
