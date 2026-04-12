@@ -7,23 +7,23 @@ module.exports = async function (context) {
 
     client
         .setEndpoint('https://cloud.appwrite.io/v1') 
-        .setProject('69dbc2e7002c8efa0c80') // ကိုမျိုးရဲ့ Project ID
-        .setKey('standard_2ce8b8e77513955e33e50d655f0eb1da84ac7cc2f1c1d14d571a5f70f1e850aea9c433448474ad9a16e6068c1be8e57acddd679f8588f79f06424dc0cfa6156f032a148736870b06da0afd791508f5f3de0e6a17777cf8f10bd70e2c50dee1d14804d7b119d11235179bd3fd7bfc490d356da4138ecdc1ad8d07f6edfb1e4d19'); // ကိုမျိုးရဲ့ API Key
+        .setProject('69dbc2e7002c8efa0c80') 
+        .setKey('standard_2ce8b8e77513955e33e50d655f0eb1da84ac7cc2f1c1d14d571a5f70f1e850aea9c433448474ad9a16e6068c1be8e57acddd679f8588f79f06424dc0cfa6156f032a148736870b06da0afd791508f5f3de0e6a17777cf8f10bd70e2c50dee1d14804d7b119d11235179bd3fd7bfc490d356da4138ecdc1ad8d07f6edfb1e4d19');
 
     try {
         const response = await axios.get('https://api.wingogame.com/get-latest-results'); 
         const data = response.data;
 
-        // ဒီမှာ Database ID နဲ့ Collection ID ကိုပဲ သုံးရပါတယ်
         await databases.createDocument(
-            '69dbcab6001e18fba9ec', // Database ID
-            'game_data_logs',        // Collection ID
+            '69dbcab6001e18fba9ec', 
+            'game_data_logs', 
             sdk.ID.unique(),
             {
-                issueNumber: data.period,
-                number: data.number,
-                type: data.type,
-                timestamp: Math.floor(Date.now() / 1000)
+                // ကိုမျိုးရဲ့ Dashboard ထဲက Column နာမည်တွေအတိုင်း ပြင်လိုက်ပါပြီ
+                "IssueNumber": String(data.period), 
+                "number": Number(data.number),
+                "type": String(data.type),
+                "timestamp": Math.floor(Date.now() / 1000)
             }
         );
 
