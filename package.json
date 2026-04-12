@@ -1,5 +1,5 @@
 {
-  "name": "win-go-data-collector",
+  "name": "win-go-sync",
   "version": "1.0.0",
   "main": "main.js",
   "dependencies": {
