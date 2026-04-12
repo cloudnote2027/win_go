@@ -11,14 +11,12 @@ module.exports = async function (context) {
         .setKey(process.env.APPWRITE_FUNCTION_API_KEY);
 
     try {
-        // Win Go API (ဒါက ဥပမာ link ပါ၊ ကိုမျိုးသုံးနေကျ link ရှိရင် အောက်ကဟာနဲ့ လဲပေးပါ)
-        const response = await axios.get('https://api.wingogame.com/get-latest-results');
+        const response = await axios.get('https://api.wingogame.com/get-latest-results'); 
         const data = response.data;
 
-        // Database ထဲ သိမ်းခြင်း
         await databases.createDocument(
-            '69dbcab6001e18fba9ec', // ကိုမျိုးပေးတဲ့ Database ID
-            'game_data_logs',       // Collection ID
+            '69dbcab6001e18fba9ec', 
+            'game_data_logs', 
             sdk.ID.unique(),
             {
                 issueNumber: data.period,
@@ -28,9 +26,8 @@ module.exports = async function (context) {
             }
         );
 
-        context.log('✅ Success: Data saved to Appwrite Database');
+        context.log('✅ Success: Sync Completed!');
         return context.res.json({ message: 'Success' });
-
     } catch (err) {
         context.error('❌ Error: ' + err.message);
         return context.res.json({ error: err.message }, 500);
