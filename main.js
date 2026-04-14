@@ -2,7 +2,7 @@ const axios = require('axios');
 
 module.exports = async function (context) {
     try {
-        // ၁။ Data Fetching (ကိုမျိုးရဲ့ API)
+        // ၁။ Data Fetching (Source API)
         const response = await axios.get('https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json');
         const list = response.data.data.list;
         
@@ -10,7 +10,7 @@ module.exports = async function (context) {
             return context.res.json({ responseBody: JSON.stringify({ status: "error", message: "Source offline" }) });
         }
 
-        // ၂။ Binary Data Conversion (1: BIG, 0: SMALL)
+        // ၂။ Binary Data Conversion
         const rawData = list.map(item => parseInt(item.number) >= 5 ? 1 : 0);
 
         // --- 🧠 1. Higher-Order Markov (2nd Order) ---
@@ -52,13 +52,13 @@ module.exports = async function (context) {
         const bayesianScore = getBayesianTrend(rawData);
         const finalScore = (fuzzyScore * 0.5) + (markovScore * 0.3) + (bayesianScore * 0.2);
 
-        // ၄။ Confidence Calculation
+        // ၄။ Agreement & Confidence
         let confidence = Math.abs(finalScore - 0.5) * 200;
         const consensus = (markovScore > 0.5 && fuzzyScore > 0.5 && bayesianScore > 0.5) ||
                           (markovScore < 0.5 && fuzzyScore < 0.5 && bayesianScore < 0.5);
         if (consensus) confidence += 12;
 
-        // ၅။ Final Response (HTML UI က ဖတ်နိုင်အောင် responseBody ထဲ ထည့်သည်)
+        // ၅။ Final Decision Result (HTML UI က ဖတ်နိုင်အောင် responseBody ထဲ ထည့်သည်)
         const finalResponse = {
             status: "success",
             period: (BigInt(list[0].issueNumber) + 1n).toString(),
