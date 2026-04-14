@@ -1,9 +1,5 @@
 {
-  "name": "win-go-sync",
-  "version": "1.0.0",
-  "main": "main.js",
   "dependencies": {
-    "node-appwrite": "^11.0.0",
     "axios": "^1.6.0"
   }
 }
