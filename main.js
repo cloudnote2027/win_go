@@ -2,15 +2,18 @@ const axios = require('axios');
 
 module.exports = async function (context) {
     try {
-        // ၁။ Data Fetching (Source API)
-        const response = await axios.get('https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json');
+        // ၁။ Data Fetching with Timeout config
+        const response = await axios.get('https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json', {
+            timeout: 15000 // 15s စောင့်မယ်
+        });
+        
         const list = response.data.data.list;
         
         if (!list || list.length === 0) {
-            return context.res.json({ responseBody: JSON.stringify({ status: "error", message: "Source offline" }) });
+            return context.res.json({ responseBody: JSON.stringify({ status: "error", message: "Empty Data" }) });
         }
 
-        // ၂။ Binary Data Conversion
+        // ၂။ Binary Data Conversion (1: BIG, 0: SMALL)
         const rawData = list.map(item => parseInt(item.number) >= 5 ? 1 : 0);
 
         // --- 🧠 1. Higher-Order Markov (2nd Order) ---
@@ -46,34 +49,30 @@ module.exports = async function (context) {
             return (prior * likelihood) / (prior * likelihood + (1 - prior) * (1 - likelihood));
         };
 
-        // ၃။ Adaptive Weight Fusion
-        const markovScore = getHigherMarkov(rawData);
-        const fuzzyScore = getFuzzyPattern(rawData);
-        const bayesianScore = getBayesianTrend(rawData);
-        const finalScore = (fuzzyScore * 0.5) + (markovScore * 0.3) + (bayesianScore * 0.2);
+        // ၃။ Weight Fusion Logic
+        const mkv = getHigherMarkov(rawData);
+        const fzy = getFuzzyPattern(rawData);
+        const bay = getBayesianTrend(rawData);
+        const finalScore = (fzy * 0.5) + (mkv * 0.3) + (bay * 0.2);
 
-        // ၄။ Agreement & Confidence
+        // ၄။ Confidence & Bonus
         let confidence = Math.abs(finalScore - 0.5) * 200;
-        const consensus = (markovScore > 0.5 && fuzzyScore > 0.5 && bayesianScore > 0.5) ||
-                          (markovScore < 0.5 && fuzzyScore < 0.5 && bayesianScore < 0.5);
+        const consensus = (mkv > 0.5 && fzy > 0.5 && bay > 0.5) || (mkv < 0.5 && fzy < 0.5 && bay < 0.5);
         if (consensus) confidence += 12;
 
-        // ၅။ Final Decision Result (HTML UI က ဖတ်နိုင်အောင် responseBody ထဲ ထည့်သည်)
-        const finalResponse = {
+        const finalResult = {
             status: "success",
             period: (BigInt(list[0].issueNumber) + 1n).toString(),
             prediction: finalScore >= 0.5 ? "BIG" : "SMALL",
             confidence: Math.min(confidence, 99.9).toFixed(2) + "%",
-            analysis: {
-                markov: (markovScore * 100).toFixed(1) + "%",
-                fuzzy: (fuzzyScore * 100).toFixed(1) + "%",
-                trend: (bayesianScore * 100).toFixed(1) + "%"
-            },
-            recommendation: confidence > 88 ? "🔥 STRONG ENTRY" : "⚖️ CAUTION"
+            mkv: (mkv * 100).toFixed(1) + "%",
+            fzy: (fzy * 100).toFixed(1) + "%",
+            bay: (bay * 100).toFixed(1) + "%",
+            rec: confidence > 88 ? "🔥 STRONG ENTRY" : "⚖️ CAUTION"
         };
 
         return context.res.json({
-            responseBody: JSON.stringify(finalResponse)
+            responseBody: JSON.stringify(finalResult)
         });
 
     } catch (err) {
