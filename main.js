@@ -1,61 +1,85 @@
-const sdk = require('node-appwrite');
 const axios = require('axios');
 
 module.exports = async function (context) {
-    const client = new sdk.Client();
-    const databases = new sdk.Databases(client);
-
-    client
-        .setEndpoint('https://sgp.cloud.appwrite.io/v1') 
-        .setProject('69dbc2e7002c8efa0c80') 
-        .setKey('standard_2ce8b8e77513955e33e50d655f0eb1da84ac7cc2f1c1d14d571a5f70f1e850aea9c433448474ad9a16e6068c1be8e57acddd679f8588f79f06424dc0cfa6156f032a148736870b06da0afd791508f5f3de0e6a17777cf8f10bd70e2c50dee1d14804d7b119d11235179bd3fd7bfc490d356da4138ecdc1ad8d07f6edfb1e4d19');
-
     try {
-        // request.json ထဲက URL အတိုင်း အတိအကျ သုံးထားပါတယ်
-        const response = await axios.post('https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList', {
-            "pageSize": 10,
-            "pageNo": 1,
-            "typeId": 1,
-            "language": 7,
-            "random": "3f2a4f251561407cbc986d4989fe26be",
-            "signature": "499E2885E36F69998213B558081C0E77",
-            "timestamp": 1776022019
-        }, {
-            headers: {
-                'Content-Type': 'application/json;charset=UTF-8',
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzc2MDIxMjI0IiwibmJmIjoiMTc3NjAyMTIyNCIsImV4cCI6IjE3NzYwMjMwMjQiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI0LzEzLzIwMjYgMjoxMzo0NCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjUzNDgwMyIsIlVzZXJOYW1lIjoiOTU5Njk5NzE2MzM1IiwiVXNlclBob3RvIjoiNSIsIk5pY2tOYW1lIjoiTWVtYmVyTk5HQldBQ1AiLCJBbW91bnQiOiIxLjkwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI0LzEzLzIwMjYgMTo0Mzo0NCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTIwLjg4LjMzLjE5MyIsIkRiTnVtYmVyIjoiMCIsIklzdmFsaWRhdG9yIjoiMCIsIktleUNvZGUiOiIzMTciLCJUb2tlblR5cGUiOiJBY2Nlc3NfVG9rZW4iLCJQaG9uZVR5cGUiOiIxIiwiVXNlclR5cGUiOiIwIiwiVXNlck5hbWUyIjoiIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.mkGa3w5X1A0WXbqC64Zo3Cp7_5vHo4nu9L0zqt_-n3k',
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 7.1.2; Pixel 4 Build/RQ3A.211001.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/81.0.4044.117 Mobile Safari/537.36',
-                'X-Requested-With': 'com.sevenbigwingame.app'
-            }
-        });
-
-        const result = response.data;
-        context.log('API Response Status:', result.msg);
-
-        if (result && result.data && result.data.list && result.data.list.length > 0) {
-            const latest = result.data.list[0];
-
-            await databases.createDocument(
-                '69dbcab6001e18fba9ec', 
-                'game_data_logs', 
-                sdk.ID.unique(),
-                {
-                    "IssueNumber": String(latest.issueNumber),
-                    "number": Number(latest.number),
-                    "type": String(latest.colour),
-                    "timestamp": Math.floor(Date.now() / 1000)
-                }
-            );
-
-            context.log('✅ Success: New record saved!');
-            return context.res.json({ message: 'Success' });
-        } else {
-            context.error('❌ Error: No list data in response');
-            return context.res.json({ error: 'Data not found' }, 404);
+        // ၁။ Data Fetching
+        const response = await axios.get('https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json');
+        const list = response.data.data.list;
+        
+        if (!list || list.length === 0) {
+            return context.res.json({ status: "error", message: "Source offline" }, 400);
         }
 
+        // ၂။ Binary Data Conversion (1: BIG, 0: SMALL)
+        const rawData = list.map(item => parseInt(item.number) >= 5 ? 1 : 0);
+        const lastThree = rawData.slice(0, 3).reverse().join(''); // လတ်တလော Pattern
+
+        // --- 🧠 1. Higher-Order Markov (2nd Order) ---
+        // အရင် ၂ လှည့်ကိုကြည့်ပြီး နောက်တစ်လှည့်ကို ခန့်မှန်းခြင်း
+        const getHigherMarkov = (data) => {
+            let transitions = {};
+            for (let i = 0; i < data.length - 2; i++) {
+                let state = `${data[i+2]}${data[i+1]}`; // အရင် ၂ လှည့်
+                let next = data[i];
+                if (!transitions[state]) transitions[state] = { 0: 0, 1: 0 };
+                transitions[state][next]++;
+            }
+            let currentState = `${rawData[1]}${rawData[0]}`;
+            let stats = transitions[currentState] || { 0: 1, 1: 1 };
+            return stats[1] / (stats[1] + stats[0]);
+        };
+
+        // --- 🧠 2. Fuzzy Pattern Matching (Long Sequence) ---
+        const getFuzzyPattern = (data) => {
+            const currentPattern = data.slice(0, 4).join('');
+            let hits = { 0: 0, 1: 0 };
+            for (let i = 0; i < data.length - 5; i++) {
+                let prevPattern = data.slice(i + 1, i + 5).join('');
+                if (prevPattern === currentPattern) {
+                    hits[data[i]]++;
+                }
+            }
+            return (hits[1] + 1) / (hits[1] + hits[0] + 2); // Laplace smoothing
+        };
+
+        // --- 🧠 3. Bayesian Trend Strength ---
+        const getBayesianTrend = (data) => {
+            const streak = data.slice(0, 5).every(x => x === data[0]);
+            let prior = streak ? 0.7 : 0.5; // Streak ဖြစ်နေရင် အရှိန်ကို ဦးစားပေး
+            const likelihood = data.slice(0, 15).filter(x => x === 1).length / 15;
+            return (prior * likelihood) / (prior * likelihood + (1 - prior) * (1 - likelihood));
+        };
+
+        // ၃။ Adaptive Weight Fusion (🎯 Fusion Logic)
+        const markovScore = getHigherMarkov(rawData);
+        const fuzzyScore = getFuzzyPattern(rawData);
+        const bayesianScore = getBayesianTrend(rawData);
+
+        // အရေးကြီးဆုံး Pattern (Sequential) ကို ၅၀% အလေးချိန်ပေးသည်
+        const finalScore = (fuzzyScore * 0.5) + (markovScore * 0.3) + (bayesianScore * 0.2);
+
+        // ၄။ Agreement & Confidence Calculation
+        let confidence = Math.abs(finalScore - 0.5) * 200;
+        const consensus = (markovScore > 0.5 && fuzzyScore > 0.5 && bayesianScore > 0.5) ||
+                          (markovScore < 0.5 && fuzzyScore < 0.5 && bayesianScore < 0.5);
+        
+        if (consensus) confidence += 12; // Model အားလုံး သဘောတူရင် Bonus ပေးမယ်
+
+        // ၅။ Final Decision Result
+        return context.res.json({
+            status: "success",
+            period: (BigInt(list[0].issueNumber) + 1n).toString(),
+            prediction: finalScore >= 0.5 ? "BIG" : "SMALL",
+            confidence: Math.min(confidence, 99.9).toFixed(2) + "%",
+            analysis: {
+                markov_2nd: (markovScore * 100).toFixed(1) + "%",
+                fuzzy_match: (fuzzyScore * 100).toFixed(1) + "%",
+                trend_bias: (bayesianScore * 100).toFixed(1) + "%"
+            },
+            recommendation: confidence > 88 ? "🔥 STRONG ENTRY" : "⚖️ CAUTION"
+        });
+
     } catch (err) {
-        context.error('❌ Error Details: ' + err.message);
-        return context.res.json({ error: err.message }, 500);
+        return context.res.json({ status: "error", message: err.message }, 500);
     }
 };
