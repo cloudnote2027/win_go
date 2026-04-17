@@ -1,5 +1,5 @@
 {
-    "name": "wingo-collector",
+    "name": "wingo-appwrite-collector",
     "version": "1.0.0",
     "dependencies": {
         "node-appwrite": "^11.0.0",
