@@ -17,6 +17,28 @@ module.exports = async function (context) {
     const WINGO_API_URL = 'https://ckygjf6r.com/api/webapi/GetNoaverageEmerdList';
     const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzc2NDI3NzE0IiwibmJmIjoiMTc3NjQyNzcxNCIsImV4cCI6IjE3NzY0Mjk1MTQiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI0LzE3LzIwMjYgNzowODozNCBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjIxMTM1MSIsIlVzZXJOYW1lIjoiOTU5Njc1NDQ3NDIwIiwiVXNlclBob3RvIjoiMSIsIk5pY2tOYW1lIjoiTWVtYmVyTk5HRDJRSFQiLCJBbW91bnQiOiIzLjM5IiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI0LzE3LzIwMjYgNjozODozNCBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiNjkuMTYwLjI4LjI0OCIsIkRiTnVtYmVyIjoiMCIsIklzdmFsaWRhdG9yIjoiMCIsIktleUNvZGUiOiI2OSIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0._QoREn7hL3Ys2KfyePsoxwmQcLQWvwiSjGDef9DxZWo';
 
+    let lastSavedIssue = null;
+
+    async function getLastSavedIssue() {
+        try {
+            const result = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTION_ID,
+                [
+                    sdk.Query.orderDesc('issue_number'),
+                    sdk.Query.limit(1)
+                ]
+            );
+            if (result.total > 0) {
+                return result.documents[0].issue_number;
+            }
+            return null;
+        } catch (err) {
+            context.error(`Error getting last issue: ${err.message}`);
+            return null;
+        }
+    }
+
     async function documentExists(issueNumber) {
         try {
             const result = await databases.listDocuments(
@@ -31,10 +53,11 @@ module.exports = async function (context) {
     }
 
     try {
-        context.log('🔄 Fetching latest WinGo data...');
+        context.log('🔄 Fetching WinGo data...');
 
+        // API က pageSize 10 ပဲ လက်ခံတယ်
         const requestBody = {
-            pageSize: 1,        // ← ၁ ပွဲပဲ ယူမယ် (အသစ်ဆုံး)
+            pageSize: 10,
             pageNo: 1,
             typeId: 1,
             language: 0,
@@ -58,52 +81,67 @@ module.exports = async function (context) {
         const result = response.data;
         context.log('API Response Code:', result.code);
 
-        if (result.code === 0 && result.data && result.data.list && result.data.list.length > 0) {
-            // အသစ်ဆုံး ၁ ပွဲပဲ ယူမယ်
-            const latestRecord = result.data.list[0];
+        if (result.code === 0 && result.data && result.data.list) {
+            const records = result.data.list;
+            context.log(`📊 Fetched ${records.length} records`);
             
-            context.log(`📊 Latest issue: ${latestRecord.issueNumber}`);
+            // Get last saved issue number
+            lastSavedIssue = await getLastSavedIssue();
+            context.log(`Last saved issue: ${lastSavedIssue || 'None'}`);
             
-            // Check if already exists
-            const exists = await documentExists(latestRecord.issueNumber);
+            let newRecords = [];
             
-            if (exists) {
-                context.log(`⏭️ Skipping ${latestRecord.issueNumber} (already exists)`);
+            // Find new records (not in database)
+            for (const record of records) {
+                const exists = await documentExists(record.issueNumber);
+                if (!exists) {
+                    newRecords.push(record);
+                }
+            }
+            
+            context.log(`🆕 New records found: ${newRecords.length}`);
+            
+            if (newRecords.length === 0) {
+                context.log('No new records to save');
                 return context.res.json({
                     success: true,
-                    message: 'Already exists',
-                    issueNumber: latestRecord.issueNumber
+                    message: 'No new records',
+                    newRecords: 0
                 });
             }
             
-            // Save only the latest record
+            // Save only the LATEST new record (first one in the list)
+            // records list comes with latest first
+            const latestNew = newRecords[0];
+            
             await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_ID,
                 sdk.ID.unique(),
                 {
-                    issue_number: latestRecord.issueNumber,
-                    number: parseInt(latestRecord.number),
-                    color: latestRecord.colour,
-                    big_small: parseInt(latestRecord.number) >= 5 ? 'Big' : 'Small',
-                    premium: latestRecord.premium || '',
+                    issue_number: latestNew.issueNumber,
+                    number: parseInt(latestNew.number),
+                    color: latestNew.colour,
+                    big_small: parseInt(latestNew.number) >= 5 ? 'Big' : 'Small',
+                    premium: latestNew.premium || '',
                     collected_at: Math.floor(Date.now() / 1000)
                 }
             );
             
-            context.log(`✅ Saved: ${latestRecord.issueNumber} → ${latestRecord.number} (${latestRecord.colour})`);
+            context.log(`✅ Saved: ${latestNew.issueNumber} → ${latestNew.number} (${latestNew.colour})`);
             
             return context.res.json({
                 success: true,
-                message: 'Saved',
-                issueNumber: latestRecord.issueNumber,
-                number: latestRecord.number,
-                color: latestRecord.colour
+                message: 'Saved latest record',
+                issueNumber: latestNew.issueNumber,
+                number: latestNew.number,
+                color: latestNew.colour,
+                totalNewFound: newRecords.length
             });
             
         } else {
-            context.error('❌ No data from API');
-            return context.res.json({ success: false, error: 'No data' }, 500);
+            context.error('❌ API error:', result.msg);
+            return context.res.json({ success: false, error: result.msg }, 500);
         }
 
     } catch (err) {
